@@ -42610,7 +42610,7 @@ function gd_js_audio(op, a, b, f, s) {
           }
         }
         if (!data) {
-          var url = /^https?:/ ? "https://geometrydash.thisisacallfor.help/_proxy?url=" + encodeURIComponent(p) : encodeURI(cands[0]);
+          var url = /^https?:/ ? "/__proxy?url=" + encodeURIComponent(p) : encodeURI(cands[0]);
           try {
             var xhr = new XMLHttpRequest;
             xhr.open("GET", url, false);
