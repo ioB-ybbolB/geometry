@@ -29,6 +29,14 @@ body{color:#fff;font-family:'Orbitron',sans-serif;touch-action:none;-webkit-user
 </style>
 </head>
 <body>
+<script>(function(){
+function emptyGamepads(){return [];}
+try{Object.defineProperty(navigator,'getGamepads',{value:emptyGamepads,configurable:true});}catch(e){try{navigator.getGamepads=emptyGamepads;}catch(_){} }
+try{Object.defineProperty(navigator,'webkitGetGamepads',{value:emptyGamepads,configurable:true});}catch(e){try{navigator.webkitGetGamepads=emptyGamepads;}catch(_){} }
+try{if(window.Navigator&&Navigator.prototype){Object.defineProperty(Navigator.prototype,'getGamepads',{value:emptyGamepads,configurable:true});Object.defineProperty(Navigator.prototype,'webkitGetGamepads',{value:emptyGamepads,configurable:true});}}catch(e){}
+window.addEventListener('gamepadconnected',function(e){e.stopImmediatePropagation();},true);
+window.addEventListener('gamepaddisconnected',function(e){e.stopImmediatePropagation();},true);
+})();</script>
 <div id="app">
   <div id="stage"><canvas id="canvas" width="1920" height="1080" aria-label="Geometry Dash game canvas"></canvas></div>
   <div id="console" aria-hidden="true"></div>
