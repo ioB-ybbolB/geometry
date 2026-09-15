@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#000010">
+<title>Geometry Dash</title>
+<link rel="icon" type="image/png" href="ref/favicon.png">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#000;overscroll-behavior:none}
+body{color:#fff;font-family:'Orbitron',sans-serif;touch-action:none;-webkit-user-select:none;user-select:none}
+#app,#stage{position:fixed;inset:0;width:100%;height:100%}
+#stage{display:flex;align-items:center;justify-content:center;background:#000}
+#canvas{display:block;background:#000;outline:none;max-width:100vw;max-height:100vh;user-select:none;-webkit-user-select:none}
+#console{display:none!important}
+#start{position:fixed;inset:0;z-index:2147483647;background:radial-gradient(circle at center,#000010,#000);color:#0ff;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;touch-action:none}
+.spinner{width:60px;height:60px;border:6px solid rgba(0,255,255,.1);border-top:6px solid #0ff;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:25px;box-shadow:0 0 15px rgba(0,255,255,.2)}
+@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+.loading-text{font-size:1.5em;letter-spacing:3px;text-align:center;text-shadow:0 0 10px #0ff,0 0 20px #0ff;animation:pulse 1.5s ease-in-out infinite;user-select:none}
+@keyframes pulse{0%,100%{opacity:1;text-shadow:0 0 10px #0ff,0 0 20px #0ff}50%{opacity:.6;text-shadow:0 0 5px #0ff,0 0 10px #0ff}}
+.progress-wrap{width:min(520px,72vw);margin-top:28px}
+.progress-track{position:relative;width:100%;height:14px;border:1px solid rgba(0,255,255,.65);border-radius:999px;background:rgba(0,255,255,.08);overflow:hidden;box-shadow:0 0 12px rgba(0,255,255,.16),inset 0 0 8px rgba(0,0,0,.8)}
+#fill{position:absolute;inset:0;background:linear-gradient(90deg,#00bfff,#0ff);clip-path:inset(0 100% 0 0);-webkit-clip-path:inset(0 100% 0 0);transition:clip-path .1s linear,-webkit-clip-path .1s linear;will-change:clip-path;box-shadow:0 0 12px rgba(0,255,255,.85)}
+#pct{margin-top:10px;text-align:center;font-size:.8em;letter-spacing:2px;color:rgba(0,255,255,.9);text-shadow:0 0 8px rgba(0,255,255,.75)}
+@media(max-width:600px){.loading-text{font-size:1.05em;letter-spacing:2px}.progress-wrap{width:78vw}}
+@media(prefers-reduced-motion:reduce){.spinner,.loading-text{animation:none}#fill{transition:none}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage"><canvas id="canvas" width="1920" height="1080" aria-label="Geometry Dash game canvas"></canvas></div>
+  <div id="console" aria-hidden="true"></div>
+</div>
+<div id="start" aria-label="Loading Geometry Dash">
+  <div class="spinner" aria-hidden="true"></div>
+  <div id="loadStatus" class="loading-text">Loading Geometry Dash...</div>
+  <div class="progress-wrap">
+    <div class="progress-track"><div id="fill"></div></div>
+    <div id="pct">0%</div>
+  </div>
+</div>
+<script>
+(function(){
+function fitCanvas(){var c=document.getElementById('canvas'),vw=window.innerWidth,vh=window.innerHeight,ratio=1920/1080,w=vw,h=vw/ratio;if(h>vh){h=vh;w=vh*ratio;}c.style.width=Math.max(1,Math.round(w))+'px';c.style.height=Math.max(1,Math.round(h))+'px';}
+window.__gdFitCanvas=fitCanvas;
+fitCanvas();
+window.addEventListener('resize',fitCanvas,{passive:true});
+if(window.visualViewport)window.visualViewport.addEventListener('resize',fitCanvas,{passive:true});
+var nativeFetch=window.fetch.bind(window),runtimeCacheName='gd-web-core-v8-chunks-20260915',manifestUrl='chunks/manifest.json';
+function cachedFetch(input,init){
+if(!('caches' in window)||location.protocol==='file:')return nativeFetch(input,init);
+var raw=(typeof Request!=='undefined'&&input instanceof Request)?input.url:String(input),url;
+try{url=new URL(raw,location.href).href;}catch(e){return nativeFetch(input,init);}
+if(navigator.serviceWorker&&navigator.serviceWorker.controller)return nativeFetch(input,init);
+return caches.match(url).then(function(hit){
+if(hit)return hit;
+return nativeFetch(input,init).then(function(response){
+if(response&&response.ok&&(!navigator.serviceWorker||!navigator.serviceWorker.controller)){
+var copy=response.clone();
+caches.open(runtimeCacheName).then(function(cache){return cache.put(url,copy);}).catch(function(){});
+}
+return response;
+});
+});
+}
+var chunkBytes=Object.create(null),chunkTasks=Object.create(null),chunkLoaded=0,chunkTotal=0;
+function reportChunkBytes(url,loaded,size){
+var previous=chunkBytes[url]||0;
+loaded=Math.max(previous,Math.min(size,loaded));
+if(loaded===previous)return;
+chunkBytes[url]=loaded;
+chunkLoaded+=loaded-previous;
+window.__gdChunkProgressActive=true;
+window.__gdChunkLoaded=chunkLoaded;
+window.__gdChunkTotal=chunkTotal;
+if(window.__gdChunkProgress)window.__gdChunkProgress(chunkLoaded,chunkTotal);
+}
+var chunkManifestPromise=cachedFetch(manifestUrl).then(function(response){
+if(!response.ok)throw new Error('Failed to load chunk manifest: '+response.status);
+return response.json();
+}).then(function(manifest){
+chunkTotal=Object.keys(manifest.files||{}).reduce(function(total,name){return total+(manifest.files[name].size||0);},0);
+window.__gdChunkTotal=chunkTotal;
+var data=manifest.files&&manifest.files['gd_web.data'],wasm=manifest.files&&manifest.files['gd_web.wasm'];
+if(data)for(var i=0;i<Math.min(6,data.chunks.length);i++)getChunkTask(data.chunks[i]);
+if(wasm)for(var j=0;j<wasm.chunks.length;j++)getChunkTask(wasm.chunks[j]);
+return manifest;
+});
+function chunkTask(part){
+var queue=[],done=false,error=null,waiters=[],loaded=0;
+function wake(){var list=waiters.splice(0);for(var i=0;i<list.length;i++)list[i]();}
+function fail(e){error=e;done=true;wake();}
+function push(value){queue.push(value);wake();}
+function finish(){if(loaded!==part.size){fail(new Error('Invalid chunk size for '+part.url+': '+loaded+' != '+part.size));return;}done=true;wake();}
+cachedFetch(part.url).then(function(response){
+if(!response.ok)throw new Error('Failed to load '+part.url+': '+response.status);
+if(!response.body||!response.body.getReader){
+return response.arrayBuffer().then(function(buffer){loaded=buffer.byteLength;reportChunkBytes(part.url,loaded,part.size);if(loaded!==part.size)throw new Error('Invalid chunk size for '+part.url);push(new Uint8Array(buffer));finish();});
+}
+var reader=response.body.getReader();
+function pump(){return reader.read().then(function(result){if(result.done){finish();return;}var value=result.value instanceof Uint8Array?result.value:new Uint8Array(result.value);loaded+=value.byteLength;reportChunkBytes(part.url,loaded,part.size);push(value);return pump();});}
+return pump();
+}).catch(fail);
+return {next:function(){
+if(queue.length)return Promise.resolve({done:false,value:queue.shift()});
+if(error)return Promise.reject(error);
+if(done)return Promise.resolve({done:true});
+return new Promise(function(resolve,reject){waiters.push(function(){if(queue.length)resolve({done:false,value:queue.shift()});else if(error)reject(error);else resolve({done:true});});});
+}};
+}
+function getChunkTask(part){return chunkTasks[part.url]||(chunkTasks[part.url]=chunkTask(part));}
+function chunkedResponse(name){
+return chunkManifestPromise.then(function(manifest){
+var file=manifest.files&&manifest.files[name];
+if(!file)throw new Error('Missing chunk manifest entry: '+name);
+var tasks=new Array(file.chunks.length),current=0,nextStart=0,prefetch=name==='gd_web.wasm'?file.chunks.length:6;
+function fillWindow(){while(nextStart<file.chunks.length&&nextStart<current+prefetch){tasks[nextStart]=getChunkTask(file.chunks[nextStart]);nextStart++;}}
+fillWindow();
+var stream=new ReadableStream({pull:function(controller){
+function send(){if(current>=file.chunks.length){controller.close();return;}return tasks[current].next().then(function(result){if(result.done){current++;fillWindow();return send();}controller.enqueue(result.value);}).catch(function(error){controller.error(error);});}
+return send();
+}});
+return new Response(stream,{status:200,headers:{'Content-Type':name.endsWith('.wasm')?'application/wasm':'application/octet-stream','Content-Length':String(file.size),'X-GD-Chunked':'1'}});
+});
+}
+window.fetch=function(input,init){
+var raw=(typeof Request!=='undefined'&&input instanceof Request)?input.url:String(input),url;
+try{url=new URL(raw,location.href);}catch(e){return nativeFetch(input,init);}
+if(url.origin===location.origin){
+var name=url.pathname.split('/').pop();
+if(name==='gd_web.data'||name==='gd_web.wasm')return chunkedResponse(name);
+if(name==='gd_web.js'||url.pathname.indexOf('/chunks/')!==-1)return cachedFetch(input,init);
+}
+return nativeFetch(input,init);
+};
+if('caches' in window&&location.protocol!=='file:')caches.open(runtimeCacheName).then(function(cache){[manifestUrl,'gd_web.js'].forEach(function(url){cache.match(url).then(function(hit){if(hit)return;cachedFetch(url).catch(function(){});});});}).catch(function(){});
+if('serviceWorker' in navigator&&location.protocol!=='file:')window.gdCacheReadyPromise=navigator.serviceWorker.register('./sw.js').then(function(){return navigator.serviceWorker.ready;}).catch(function(err){console.warn('[cache] service worker unavailable',err);});else window.gdCacheReadyPromise=Promise.resolve();
+})();
+</script>
+<script>var consoleEl = document.getElementById('console');
+try { Error.stackTraceLimit = 400; } catch (e) {}
+var logQueue = [], logScheduled = false;
+window.gdLogRaw = [];
+var GD_LOG_DOM_MAX = 4000;
+window.gdLogDump = function () { return window.gdLogRaw.join('\n'); };
+function flushLog() {
+logScheduled = false;
+if (!logQueue.length) return;
+var frag = document.createDocumentFragment();
+for (var i = 0; i < logQueue.length; i++) {
+var line = document.createElement('div');
+line.textContent = logQueue[i];
+frag.appendChild(line);
+}
+logQueue = [];
+var nearBottom =
+consoleEl.scrollHeight - consoleEl.scrollTop - consoleEl.clientHeight < 40;
+consoleEl.appendChild(frag);
+while (consoleEl.childNodes.length > GD_LOG_DOM_MAX)
+consoleEl.removeChild(consoleEl.firstChild);
+if (nearBottom) consoleEl.scrollTop = consoleEl.scrollHeight;
+}
+var seenDep = Object.create(null);
+var QUIET = ['[perf]', '[frame]', '[webgl]', '[io]', '[tex]', '[pngc]',
+'[pngd]', '[fmtf]', '[sink]', '[htb]', '[disp]', '[rawin]',
+'[touch]', '[cte]', '[list]', '[drs]', '[tex2]'];
+function isQuiet(str) {
+for (var i = 0; i < QUIET.length; ++i) {
+if (str.lastIndexOf(QUIET[i], 0) === 0) return true;
+}
+return false;
+}
+function say(s) {
+var str = String(s);
+if (!isQuiet(str)) console.log(s);
+if (str.indexOf('dependency: ') === 0 ||
+str.indexOf('still waiting on run dependencies') === 0 ||
+str === '(end of list)') {
+if (seenDep[str]) return;
+seenDep[str] = 1;
+}
+window.gdLogRaw.push(str);
+if (window.gdLogRaw.length > 400000)
+window.gdLogRaw.splice(0, 100000);
+logQueue.push(str);
+if (!logScheduled) {
+logScheduled = true;
+requestAnimationFrame(flushLog);
+}
+}
+var gdProg = 0, gdProgDone = false;
+var fillEl = document.getElementById('fill');
+var pctEl = document.getElementById('pct');
+var loadStatusEl = document.getElementById('loadStatus');
+function bumpOut() {
+var startEl = document.getElementById('start');
+if (startEl.dataset.handoff === '1') return;
+startEl.dataset.handoff = '1';
+startEl.style.display = 'none';
+window.__gdInputReady = true;
+if (window.__gdFitCanvas) window.__gdFitCanvas();
+try { document.getElementById('canvas').focus(); } catch (e) {}
+if (window.__gdAckFocus) window.__gdAckFocus();
+}
+function setProgress(p) {
+if (gdProgDone && p < 100) return;
+p = Math.max(0, Math.min(100, p));
+if (p < gdProg) return;
+gdProg = p;
+var hidden = (100 - p).toFixed(4) + '%';
+fillEl.style.clipPath = 'inset(0 ' + hidden + ' 0 0)';
+fillEl.style.webkitClipPath = 'inset(0 ' + hidden + ' 0 0)';
+pctEl.textContent = p.toFixed(0) + '%';
+if (p >= 100) {
+gdProgDone = true;
+bumpOut();
+}
+}
+function resetProgress() {
+gdProgDone = false;
+gdProg = 0;
+fillEl.style.clipPath = 'inset(0 100% 0 0)';
+fillEl.style.webkitClipPath = 'inset(0 100% 0 0)';
+pctEl.textContent = '0%';
+if (loadStatusEl) loadStatusEl.textContent = 'Loading Geometry Dash...';
+}
+window.__gdChunkProgress=function(loaded,total){
+if(!total)return;
+setProgress(3+Math.min(1,loaded/total)*77);
+};
+if(window.__gdChunkLoaded&&window.__gdChunkTotal)window.__gdChunkProgress(window.__gdChunkLoaded,window.__gdChunkTotal);
+window.gdFirstFrame = function () { setProgress(100); };
+var gdSaveTimer = null;
+function scheduleSave() {
+if (!window.__gdRuntimeReady) return;
+if (gdSaveTimer) clearTimeout(gdSaveTimer);
+gdSaveTimer = setTimeout(function () {
+gdSaveTimer = null;
+try { if (Module._gd_request_save) Module._gd_request_save(); } catch (e) {}
+}, 2500);
+}
+window.addEventListener('mousedown', scheduleSave);
+window.addEventListener('keydown', scheduleSave);
+setInterval(function () {
+if (!window.__gdLoadStarted || gdProgDone || window.__gdChunkProgressActive) return;
+var df = Module.dataFileDownloads;
+var loaded = 0, total = 0;
+if (df) {
+for (var k in df) {
+loaded += df[k].loaded || 0;
+total += df[k].total || 0;
+}
+}
+if (total > 0) {
+window.__gdDataProgress = true;
+setProgress(loaded / total * 78);
+} else if (!window.__gdDataProgress && gdProg < 8) {
+setProgress(gdProg + 0.35);
+}
+}, 200);
+(function () {
+function detectFrame() {
+if (window.__gdGotFrame) return;
+if (window.__gdRuntimeReady) {
+var n = 0;
+try {
+if (Module._gd_frames_get) n = Module._gd_frames_get() | 0;
+} catch (e) {}
+if (n > 0) {
+window.__gdGotFrame = true;
+setProgress(100);
+return;
+}
+}
+requestAnimationFrame(detectFrame);
+}
+requestAnimationFrame(detectFrame);
+})();
+function dumpTrace() {
+if (!window.__gdRuntimeReady) { say('runtime not initialized; no trace'); return; }
+try {
+if (!Module._gd_trace_count) { say('no trace exports'); return; }
+var n = Module._gd_trace_count();
+var m = Math.min(48, n);
+var out = [];
+for (var i = 0; i < m; ++i) {
+var va = Module._gd_trace_at(i);
+if (typeof va === 'bigint') va = Number(va & 0xffffffffn);
+else va = va >>> 0;
+out.push('0x' + va.toString(16));
+}
+say('TRACE total=' + n + ' newest-first: ' + out.join(' '));
+} catch (e) { say('trace dump failed: ' + e); }
+}
+window.addEventListener('error', e => { say('ERROR: ' + e.message); dumpTrace(); });
+window.addEventListener('unhandledrejection', e => { say('REJECT: ' + e.reason); dumpTrace(); });
+function restoreSaves(then) {
+var called = false;
+function finish() { if (!called) { called = true; then(); } }
+setTimeout(finish, 3000);
+try {
+var req = indexedDB.open('gdwasm_saves', 1);
+req.onupgradeneeded = function () { req.result.createObjectStore('files'); };
+req.onerror = function () { say('[persist] idb open failed'); finish(); };
+req.onsuccess = function () {
+var store, keysReq;
+try {
+store = req.result.transaction('files', 'readonly').objectStore('files');
+keysReq = store.getAllKeys();
+} catch (e) { finish(); return; }
+keysReq.onerror = finish;
+keysReq.onsuccess = function () {
+var keys = keysReq.result || [];
+say('[persist] restore: ' + keys.length + ' file(s) in DB' +
+(keys.length ? ': ' + keys.join(', ') : ''));
+if (!keys.length) { finish(); return; }
+var pending = keys.length;
+function one() { if (--pending === 0) finish(); }
+keys.forEach(function (k) {
+var g = store.get(k);
+g.onerror = one;
+g.onsuccess = function () {
+try {
+if (g.result && g.result.byteLength) {
+Module.FS.writeFile('/Resources/' + k, new Uint8Array(g.result));
+say('[persist] restored ' + k + ' (' + g.result.byteLength + ' bytes)');
+}
+} catch (e) { say('[persist] restore ' + k + ': ' + e); }
+one();
+};
+});
+};
+};
+} catch (e) { finish(); }
+}
+var Module = {
+canvas: document.getElementById('canvas'),
+gdInputQueue: [],
+gdCursorPos: [0, 0],
+locateFile: function (p) { return p; },
+print: function (s) { say(s); },
+printErr: function (s) { say(s); },
+setStatus: function (t) {
+if (!t) return;
+if(window.__gdChunkProgressActive){if(t.indexOf('Running')===0)setProgress(80);return;}
+var m = /\((\d+)\/(\d+)\)/.exec(t);
+if (m) {
+var total = +m[2] || 1;
+setProgress(+m[1] / total * 78);
+} else if (t.indexOf('Downloading') === 0) {
+setProgress(4);
+} else if (t.indexOf('Running') === 0) {
+setProgress(80);
+}
+},
+onRuntimeInitialized: function () {
+window.__gdRuntimeReady = true;
+if (!/[?&]auto/.test(location.search) && Module._gd_autosave_set)
+Module._gd_autosave_set(0);
+if (/[?&]noauto/.test(location.search) && Module._gd_autosave_set)
+Module._gd_autosave_set(0);
+setProgress(82);
+try {
+Module.FS.chdir('/Resources');
+} catch (e) {
+say('FS.chdir failed: ' + e);
+}
+setTimeout(function () {
+restoreSaves(function () {
+setProgress(88);
+try {
+const r = Module._gd_boot();
+setProgress(92);
+if (r && typeof r.then === 'function') {
+r.then(function () { say('gd_boot resolved'); setProgress(98); })
+.catch(function (e) {
+say('gd_boot rejected: ' + e);
+if (e && e.stack) say('STACK: ' + e.stack);
+dumpTrace();
+});
+} else {
+say('gd_boot returned (sync)');
+setProgress(98);
+}
+} catch (e) {
+say('gd_boot exception: ' + e);
+}
+});
+}, 100);
+}
+};
+var started = false;
+function gdStart() {
+if (started) return;
+started = true;
+window.__gdLoadStarted = true;
+resetProgress();
+if(window.__gdChunkLoaded&&window.__gdChunkTotal)window.__gdChunkProgress(window.__gdChunkLoaded,window.__gdChunkTotal);else setProgress(1);
+function launchRuntime() {
+if (launchRuntime.done) return;
+launchRuntime.done = true;
+setProgress(3);
+var script = document.createElement('script');
+script.src = 'gd_web.js';
+script.onerror = function () { if (loadStatusEl) loadStatusEl.textContent = 'Failed to load Geometry Dash'; say('failed to load gd_web.js'); };
+document.body.appendChild(script);
+}
+launchRuntime();
+}
+requestAnimationFrame(function(){ setTimeout(gdStart, 0); });</script><script>(function () {
+const el = document.getElementById('canvas');
+const WM_MOUSEMOVE = 0x200, WM_LBUTTONDOWN = 0x201, WM_LBUTTONUP = 0x202,
+WM_RBUTTONDOWN = 0x204, WM_RBUTTONUP = 0x205,
+WM_MBUTTONDOWN = 0x207, WM_MBUTTONUP = 0x208;
+function ready() { return window.__gdInputReady === true; }
+function overCanvas(e) {
+var r;
+if (!ready() || !el) return false;
+if (e.target && e.target.closest &&
+e.target.closest('#console, #start, a, button, input, ' +
+'textarea, select')) {
+return false;
+}
+r = el.getBoundingClientRect();
+return e.clientX >= r.left && e.clientX < r.right &&
+e.clientY >= r.top && e.clientY < r.bottom;
+}
+function pos(e) {
+const r = el.getBoundingClientRect();
+const x = Math.max(0, Math.min(1919,
+Math.round((e.clientX - r.left) * 1920 / r.width)));
+const y = Math.max(0, Math.min(1079,
+Math.round((e.clientY - r.top) * 1080 / r.height)));
+Module.gdCursorPos[0] = x;
+Module.gdCursorPos[1] = y;
+return (x & 0xffff) | ((y & 0xffff) << 16);
+}
+function push(m, w, l) { Module.gdInputQueue.push([m | 0, w | 0, l | 0]); }
+var ackedFocus = false;
+function ackFocus() {
+if (ackedFocus) return;
+ackedFocus = true;
+push(0x0006, 1, 0);
+push(0x0007, 0, 0);
+push(0x001c, 1, 0);
+}
+window.__gdAckFocus = ackFocus;
+window.addEventListener('mousedown', function (e) {
+if (!overCanvas(e)) return;
+console.log('[page] mousedown btn=' + e.button + ' lp=0x' + pos(e).toString(16));
+var m = e.button === 2 ? WM_RBUTTONDOWN : (e.button === 1 ? WM_MBUTTONDOWN : WM_LBUTTONDOWN);
+var w = e.button === 2 ? 2 : (e.button === 1 ? 16 : 1);
+push(m, w, pos(e));
+e.preventDefault();
+});
+window.addEventListener('mouseup', function (e) {
+if (!ready()) return;
+console.log('[page] mouseup btn=' + e.button + ' lp=0x' + pos(e).toString(16));
+var m = e.button === 2 ? WM_RBUTTONUP : (e.button === 1 ? WM_MBUTTONUP : WM_LBUTTONUP);
+push(m, 0, pos(e));
+if (e.target === el) e.preventDefault();
+});
+window.addEventListener('mousemove', function (e) {
+if (!ready()) return;
+var q = Module.gdInputQueue;
+var w = (e.buttons & 1) ? 1 : 0, l = pos(e);
+if (q.length && q[q.length - 1][0] === WM_MOUSEMOVE) {
+q[q.length - 1] = [WM_MOUSEMOVE, w, l];
+} else {
+q.push([WM_MOUSEMOVE, w, l]);
+}
+});
+window.addEventListener('wheel', function (e) {
+if (!overCanvas(e)) return;
+var lp = pos(e);
+var dv = -e.deltaY, dh = e.deltaX;
+if (Math.abs(dv) >= Math.abs(dh)) {
+var notch = dv > 0 ? 120 : -120;
+push(0x020A, (notch & 0xFFFF) << 16, lp);
+} else {
+var hnotch = dh > 0 ? -120 : 120;
+push(0x020E, (hnotch & 0xFFFF) << 16, lp);
+}
+e.preventDefault();
+}, { passive: false });
+el.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+el.tabIndex = 0;
+el.addEventListener('mousedown', function () { el.focus(); });
+var rawKeyN = 0;
+document.addEventListener('keydown', function (e) {
+if (rawKeyN++ < 10)
+console.log('[page] raw keydown code=' + e.code + ' key=' + e.key);
+}, true);
+var VK = { 'Escape':0x1B,'Space':0x20,'Enter':0x0D,'Backspace':0x08,'Tab':0x09,
+'ArrowLeft':0x25,'ArrowUp':0x26,'ArrowRight':0x27,'ArrowDown':0x28,
+'KeyW':0x57,'KeyA':0x41,'KeyS':0x53,'KeyD':0x44,
+'KeyQ':0x51,'KeyE':0x45,'KeyR':0x52,'KeyF':0x46,'KeyP':0x50 };
+var SCAN = { 'Escape':0x01,'Space':0x39,'Enter':0x1C,'Backspace':0x0E,'Tab':0x0F,
+'ArrowLeft':0x4B,'ArrowUp':0x48,'ArrowRight':0x4D,'ArrowDown':0x50,
+'KeyW':0x11,'KeyA':0x1E,'KeyS':0x1F,'KeyD':0x20,
+'KeyQ':0x10,'KeyE':0x12,'KeyR':0x13,'KeyF':0x21,'KeyP':0x19 };
+var EXT = { 'ArrowLeft':1,'ArrowUp':1,'ArrowRight':1,'ArrowDown':1 };
+Module.gdKeyState = new Uint8Array(256);
+function keyEvent(e, down) {
+if (!ready()) return;
+try {
+if (window.getSelection && String(window.getSelection()) !== '') return;
+} catch (err) {}
+var vk = VK[e.code] || e.keyCode || 0;
+if (down) {
+var ch = 0;
+if (e.key && e.key.length === 1) ch = e.key.charCodeAt(0);
+else if (e.code === 'Backspace') ch = 0x08;
+else if (e.code === 'Enter') ch = 0x0D;
+if (ch) {
+var clp = 1 | ((SCAN[e.code] || 0) << 16);
+if (EXT[e.code]) clp |= 0x1000000;
+if (keyEvent.cn === undefined) keyEvent.cn = 0;
+if (keyEvent.cn++ < 12)
+console.log('[page] char=0x' + ch.toString(16) + ' code=' + e.code);
+push(0x0102, ch, clp);
+}
+}
+if (!vk) return;
+if (keyEvent.n === undefined) keyEvent.n = 0;
+if (keyEvent.n++ < 8)
+console.log('[page] key ' + (down ? 'down' : 'up') + ' code=' + e.code +
+' vk=0x' + vk.toString(16));
+Module.gdKeyState[vk & 0xff] = down ? 1 : 0;
+var scan = SCAN[e.code] || 0;
+var lp = 1 | (scan << 16);
+if (EXT[e.code]) lp |= 0x1000000;
+if (!down) lp |= -1073741824;
+push(down ? 0x100 : 0x101, vk, lp);
+if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'ArrowDown')
+e.preventDefault();
+}
+window.addEventListener('keydown', function (e) { keyEvent(e, true); });
+window.addEventListener('keyup', function (e) { keyEvent(e, false); });
+})();</script>
+</body></html>
